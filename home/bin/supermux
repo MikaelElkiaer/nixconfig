@@ -1,0 +1,305 @@
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
+
+function _main {
+  _init_args "$@"
+  _export_functions
+  _exec_fzf && EXIT_CODE=0 || EXIT_CODE=$?
+
+  # Ignore escape and interrupts
+  if [ "$EXIT_CODE" -ne 130 ]; then
+    exit "$EXIT_CODE"
+  fi
+}
+
+function _init_args {
+  optspec="x-:"
+  while getopts "$optspec" optchar; do
+    case "${optchar}" in
+    -)
+      case "${OPTARG}" in
+      *)
+        if [ "$OPTERR" = 1 ] && [ "${optspec:0:1}" != ":" ]; then
+          echo "Unknown option --${OPTARG}" >&2
+        fi
+        ;;
+      esac
+      ;;
+    *)
+      if [ "$OPTERR" != 1 ] || [ "${optspec:0:1}" = ":" ]; then
+        echo "Non-option argument: '-${OPTARG}'" >&2
+      fi
+      ;;
+    esac
+  done
+}
+
+function _export_functions {
+  functions=()
+  for f in $(declare -F | sed --quiet --regexp-extended 's/declare -f ([^_].*)/\1/p'); do
+    functions+=("$f")
+  done
+  eval export -f "${functions[*]}"
+}
+
+function _exec_fzf {
+  echo -n "" | fzf \
+    --bind='backward-eof:change-prompt(> )+reload(load)+rebind(change)+unbind(backward-eof)' \
+    --bind='change:transform(detect_mode {q})' \
+    --bind='focus:transform-border-label(change_border_label {})' \
+    --bind='load:reload(load)+unbind(load)+unbind(backward-eof)' \
+    --bind='enter:become(action_primary {})' \
+    --bind='tab:become(action_secondary {})' \
+    --bind="ctrl-p:toggle-preview" \
+    --delimiter='\t' \
+    --nth=2 \
+    --preview='(preview {})' \
+    --preview-window=up,wrap \
+    --with-nth=3,4
+}
+
+function detect_mode {
+  case "$1" in
+  'c ')
+    match=1
+    cmd="get_commands"
+    prompt="commands"
+    ;;
+  'd ')
+    match=1
+    cmd="get_directories"
+    prompt="directories"
+    ;;
+  'k ')
+    match=1
+    cmd="get_tmux_keys"
+    prompt="keys"
+    ;;
+  *) ;;
+  esac
+  if [ -n "${match:-}" ]; then
+    echo "clear-query+change-prompt($prompt> )+reload($cmd)+unbind(change)+rebind(backward-eof)"
+  fi
+}
+
+function load {
+  get_tmux_windows &
+  wait
+}
+
+function change_border_label {
+  read -r TYPE FULL ICON NAME <<<"$1"
+  case "$TYPE" in
+  c)
+    echo " 󰌑 run  prompt "
+    ;;
+  d)
+    echo " 󰌑 nvim  prompt "
+    ;;
+  k)
+    echo " 󰌑 run "
+    ;;
+  s)
+    echo " 󰌑 k9s  prompt "
+    ;;
+  t)
+    echo " 󰌑 switch "
+    ;;
+  *)
+    echo ""
+    ;;
+  esac
+}
+
+function preview {
+  IFS=$'\t' read -r TYPE FULL ICON NAME <<<"$1"
+  case "$TYPE" in
+  c)
+    man "$NAME" 2>/dev/null | nvimpager -c +"set ft=man"
+    ;;
+  d)
+    README="$(find "$FULL" -maxdepth 1 -type f -iname readme.md)"
+    if [ -n "$README" ]; then
+      nvimpager -c "$README" +"set ft=markdown"
+    else
+      tree -a -C -I '.git' -L 5 "$FULL"
+    fi
+    ;;
+  k)
+    tmux list-keys -Tprefix "${FULL//;/\\;}" | sed 's/bind-key\( -r\)\? -T prefix [^ ]\+ //'
+    ;;
+  t)
+    read -r ID _ <<<"$FULL"
+    tmux capture-pane -p -e -t "$ID"
+    ;;
+  esac
+}
+
+function action_primary {
+  IFS=$'\t' read -r TYPE FULL ICON NAME <<<"$1"
+
+  case "$TYPE" in
+  c)
+    exec "$FULL"
+    ;;
+  d)
+    tmux new-window -c "$FULL" bash -i -c "nvim -c ':lua require(\"persistence\").load()';exec bash"
+    ;;
+  k)
+    eval "tmux $(tmux list-keys -Tprefix "${FULL//;/\\;}" | sed 's/bind-key\( -r\)\? -T prefix [^ ]\+ //')"
+    ;;
+  s)
+    echo "Loading Kubernetes context..." >&2
+    read -r KUBECONFIG NAME <<<"$(switcher set-context "$FULL" | sed -E 's/^__ (.*),(.*)/\1 \2/')"
+    # TODO: Remove KUBECACHEDIR once fixed
+    # - see https://github.com/derailed/k9s/issues/1895
+    NEW_PANE_ID="$(tmux new-window -c "$HOME" -d -e "KUBECONFIG=$KUBECONFIG" -e "KUBECACHEDIR=$HOME/.kube/cache" -P -F '#{pane_id}' bash -i -c 'k9s;exec bash')"
+    # INFO: Create symlink so temporary config can be cleaned up by a hook
+    ln --symbolic --force "$KUBECONFIG" "/tmp/TMUX_${NEW_PANE_ID}_KUBECONFIG"
+    # TODO: Figure out why this is not working
+    tmux set-hook -p -t "$NEW_PANE_ID" pane-exited "run-shell 'rm --force \"$(readlink --canonicalize /tmp/TMUX_#{hook_pane}_KUBECONFIG)\" /tmp/TMUX_#{hook_pane}_KUBECONFIG'"
+    tmux switch-client -t "$NEW_PANE_ID"
+    ;;
+  t)
+    tmux switch-client -t "$FULL"
+    ;;
+  esac
+}
+
+function action_secondary {
+  IFS=$'\t' read -r TYPE FULL ICON NAME <<<"$1"
+
+  case "$TYPE" in
+  c)
+    bash_prompt "$NAME"
+    ;;
+  d)
+    tmux new-window -c "$FULL" bash
+    ;;
+  s)
+    echo "Loading Kubernetes context..." >&2
+    read -r KUBECONFIG NAME <<<"$(switcher set-context "$FULL" | sed -E 's/^__ (.*),(.*)/\1 \2/')"
+    # TODO: Remove KUBECACHEDIR once fixed
+    # - see https://github.com/derailed/k9s/issues/1895
+    NEW_PANE_ID="$(tmux new-window -c "$HOME" -d -e "KUBECONFIG=$KUBECONFIG" -e "KUBECACHEDIR=$HOME/.kube/cache" -P -F '#{pane_id}' bash -i -c 'bash')"
+    # INFO: Create symlink so temporary config can be cleaned up by a hook
+    ln --symbolic --force "$KUBECONFIG" "/tmp/TMUX_${NEW_PANE_ID}_KUBECONFIG"
+    # TODO: Figure out why this is not working
+    tmux set-hook -p -t "$NEW_PANE_ID" pane-exited "run-shell 'rm --force \"$(readlink --canonicalize /tmp/TMUX_#{hook_pane}_KUBECONFIG)\" /tmp/TMUX_#{hook_pane}_KUBECONFIG'"
+    tmux switch-client -t "$NEW_PANE_ID"
+    ;;
+  esac
+}
+
+function get_commands {
+  local EXTRA_ICONS FULL ICON NAME TYPE
+  ICON="$(color magenta 󰘔)"
+  TYPE="c"
+  compgen -c |
+    sort --unique |
+    while read -r NAME; do
+      FULL="$(type -p "$NAME")"
+      if [ -z "$FULL" ]; then
+        continue
+      fi
+      local EXTRA_ICONS=""
+      if [ "$FULL" = "$HOME/.nix-profile/bin/$NAME" ]; then
+        EXTRA_ICONS+=" $(color cyan 󱄅)"
+      elif [ "$FULL" = "$HOME/bin/$NAME" ]; then
+        EXTRA_ICONS+=" $(color green )"
+      fi
+      echo -e "$TYPE\t$FULL\t$ICON$EXTRA_ICONS\t$NAME"
+    done
+}
+
+function get_directories {
+  local EXTRA_ICONS FULL ICON NAME TYPE
+  ICON="$(color blue )"
+  TYPE="d"
+  zoxide query --list |
+    while read -r NAME; do
+      EXTRA_ICONS=""
+      FULL="$NAME"
+      if [ -d "$NAME/.git" ]; then
+        EXTRA_ICONS+=" $(color yellow )"
+      fi
+      echo -e "$TYPE\t$FULL\t$ICON$EXTRA_ICONS\t$NAME"
+    done
+}
+
+function get_kube_contexts {
+  local FULL ICON NAME TYPE
+  ICON="$(color cyan 󱃾)"
+  TYPE="s"
+  switcher list-contexts |
+    while read -r NAME; do
+      FULL="$NAME"
+      echo -e "$TYPE\t$FULL\t$ICON\t$NAME"
+    done
+}
+
+function get_tmux_keys {
+  local FULL ICON NAME TYPE
+  ICON="$(color magenta )"
+  TYPE="k"
+  tmux list-keys -N -Tprefix |
+    while read -r FULL NAME; do
+      echo -e "$TYPE\t$FULL\t$ICON\t$NAME"
+    done
+}
+
+function get_tmux_windows {
+  local FULL ICON NAME TYPE
+  ICON="$(color green )"
+  TYPE="t"
+  tmux list-windows -a -F "#{window_id}" -f '#{?#{m:_popup_*,#{session_name}},0,1}' |
+    while read -r FULL; do
+      # TODO: Replace tmux styling format with ANSI escape codes
+      NAME="$(eval "NOSHORT= NOFORMAT= windowmux $FULL")$(eval "NOFORMAT= kubemux $FULL")"
+      echo -e "$TYPE\t$FULL\t$ICON\t$NAME"
+    done
+}
+
+function color {
+  declare -x color_reset color
+  color=
+  color_reset="$(tput sgr0)"
+
+  case $1 in
+  black)
+    color="$(tput setaf 0)"
+    ;;
+  blue)
+    color="$(tput setaf 4)"
+    ;;
+  cyan)
+    color="$(tput setaf 6)"
+    ;;
+  default)
+    color="$color_reset"
+    ;;
+  green)
+    color="$(tput setaf 2)"
+    ;;
+  magenta)
+    color="$(tput setaf 5)"
+    ;;
+  red)
+    color="$(tput setaf 1)"
+    ;;
+  yellow)
+    color="$(tput setaf 3)"
+    ;;
+  white)
+    color="$(tput setaf 15)"
+    ;;
+  *)
+    echo "[WRN] Color must be one of: black, blue, cyan, default, green, magenta, red, yellow, white" >&2
+    ;;
+  esac
+
+  echo -e "$color$2$color_reset"
+}
+
+_main "$@"

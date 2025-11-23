@@ -1,0 +1,9 @@
+# Avoid accidentally quitting - use ^C instead
+confirmOnQuit: true
+git:
+  commit:
+    signOff: false
+  overrideGpg: true
+  pagers:
+    - colorArg: always
+      pager: delta --paging=never --true-color=never

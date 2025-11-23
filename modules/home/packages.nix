@@ -1,44 +1,78 @@
 { pkgs, ... }:
 {
-  # Nix packages to install to $HOME
-  #
-  # Search for packages here: https://search.nixos.org/packages
   home.packages = with pkgs; [
-    omnix
-
-    # Unix tools
-    ripgrep # Better `grep`
-    fd
-    sd
-    tree
+    atuin
+    bats
+    cargo
+    # WARN: Comes with nix-unified
+    # comma
+    # WARN: Not supported by darwin
+    # dagger
+    delta
+    docker-credential-helpers
+    expect
+    file
+    fluxcd
+    fzf
+    gh
+    gh-copilot
+    gh-dash
+    gh-markdown-preview
+    git
+    glow
+    gnused
+    go
+    gotop
+    gitmux
     gnumake
-
+    htop
+    hyperfine
+    just
+    kind
+    k9s
+    krew
+    kubectl
+    kubectl-validate
+    (wrapHelm kubernetes-helm {
+      plugins = [
+        kubernetes-helmPlugins.helm-diff
+      ];
+    })
+    kubeseal
+    kubeswitch
+    lazygit
+    lnav
+    navi
+    ncurses
+    nix-init
+    nodejs
+    pigz
+    pluto
+    podman
+    python3
+    ripgrep
+    skopeo
+    tlrc # tldr (Rust)
+    tmux
+    tree
+    trivy
+    unzip
+    update-nix-fetchgit
+    uutils-coreutils-noprefix
+    viddy
+    wget
+    xclip
+    xsel
+    xdg-utils
+    yank
+    yq-go
+    zoxide
+    # INFO: nixos-unified-template defaults
+    omnix
     # Nix dev
     cachix
     nil # Nix language server
     nix-info
     nixpkgs-fmt
-
-
-    # On ubuntu, we need this less for `man home-configuration.nix`'s pager to
-    # work.
-    less
   ];
-
-  # Programs natively supported by home-manager.
-  # They can be configured in `programs.*` instead of using home.packages.
-  programs = {
-    # Better `cat`
-    bat.enable = true;
-    # Type `<ctrl> + r` to fuzzy search your shell history
-    fzf.enable = true;
-    jq.enable = true;
-    # Install btop https://github.com/aristocratos/btop
-    btop.enable = true;
-    # Tmate terminal sharing.
-    tmate = {
-      enable = true;
-      #host = ""; #In case you wish to use a server other than tmate.io
-    };
-  };
 }

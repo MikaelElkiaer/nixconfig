@@ -8,4 +8,7 @@
   home.packages = [
     config.nix.package
   ];
+  nixpkgs.config = {
+    allowUnfree = true;
+  };
 }

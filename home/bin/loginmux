@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
+
+function get_icon() {
+  case "$1" in
+  "aws")
+    echo ""
+    ;;
+  "gkd")
+    echo ""
+    ;;
+  "lps")
+    echo "󰑆"
+    ;;
+  "vlt")
+    echo ""
+    ;;
+  *)
+    echo "$1"
+    ;;
+  esac
+}
+
+OUTPUT="  "
+for f in ~/.local/state/login-status-*; do
+  [ -e "$f" ] || continue
+  STATUS=$(<"$f")
+  if [ "$STATUS" -eq 0 ]; then
+    PROVIDER=$(basename "$f" | sed 's/login-status-//')
+    OUTPUT+=" #[fg=green]$(get_icon "$PROVIDER")#[fg=default]"
+  else
+    PROVIDER=$(basename "$f" | sed 's/login-status-//')
+    OUTPUT+=" #[fg=red]$(get_icon "$PROVIDER")#[fg=default]"
+  fi
+done
+
+echo "$OUTPUT"

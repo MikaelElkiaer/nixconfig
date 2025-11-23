@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
+
+if ! [ -f ~/.cache/nerdfonts.json ]; then
+  echo "[DBG] Downloading nerdfonts.json" >&2
+  wget https://raw.githubusercontent.com/ryanoasis/nerd-fonts/master/glyphnames.json --output-document ~/.cache/nerdfonts.json
+fi
+
+jq --raw-output 'to_entries | .[1:] | map("\(.value.char)\t\(.key)") | .[]' <~/.cache/nerdfonts.json |
+  fzf --accept-nth=1 --nth=2 --delimiter=$'\t' |
+  tmux load-buffer -w -

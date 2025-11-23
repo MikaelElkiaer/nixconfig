@@ -1,0 +1,268 @@
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
+
+function main() {
+  _init_args "$@"
+
+  # Default values
+  local MODE="${ARG__MODE:-fzf}"
+  UNREAD_ONLY="${ARG__UNREAD_ONLY:-"1"}"
+  PREVIEW_DIFF="${ARG__PREVIEW_DIFF:-"0"}"
+
+  case "$MODE" in
+  fzf)
+    _exec_fzf || error_code=$?
+    if [ "${error_code:-}" -ne 130 ]; then
+      exit "$error_code"
+    fi
+    ;;
+  print)
+    _get_data
+    ;;
+  *)
+    echo "Unknown mode: $MODE" >&2
+    exit 1
+    ;;
+  esac
+}
+
+function _init_args() {
+  optspec="m:r-:"
+  while getopts "$optspec" optchar; do
+    case "${optchar}" in
+    -)
+      case "${OPTARG}" in
+      preview-diff)
+        OPTIND=$((OPTIND + 1))
+        ARG__PREVIEW_DIFF="1"
+        ;;
+      mode)
+        ARG__MODE="${!OPTIND}"
+        OPTIND=$((OPTIND + 1))
+        ;;
+      unread-only)
+        ARG__UNREAD_ONLY="1"
+        OPTIND=$((OPTIND + 1))
+        ;;
+      *)
+        if [ "$OPTERR" = 1 ] && [ "${optspec:0:1}" != ":" ]; then
+          echo "Unknown option --${OPTARG}" >&2
+        fi
+        ;;
+      esac
+      ;;
+    d)
+      ARG__PREVIEW_DIFF="1"
+      ;;
+    m)
+      ARG__MODE="${OPTARG}"
+      ;;
+    u)
+      ARG__UNREAD_ONLY="1"
+      ;;
+    *)
+      if [ "$OPTERR" != 1 ] || [ "${optspec:0:1}" = ":" ]; then
+        echo "Non-option argument: '-${OPTARG}'" >&2
+      fi
+      ;;
+    esac
+  done
+}
+
+function _get_data() {
+  local FILTER="-is:done"
+  if [ "$(_get_option unread-only "$UNREAD_ONLY")" = "1" ]; then
+    FILTER="$FILTER is:unread"
+  fi
+
+  # shellcheck disable=SC2016
+  gh api graphql \
+    --field=filter="$FILTER" \
+    --field=query='
+      query($filter: String!) {
+        viewer {
+          notificationThreads(last: 50, query: $filter) {
+            nodes {
+              isUnread
+              id
+              title
+              reason
+              url
+              subject {
+                __typename
+                ... on PullRequest { __typename repository { nameWithOwner } state }
+                ... on Issue { __typename repository { nameWithOwner } state stateReason }
+              }
+            }
+          }
+        }
+      }' \
+    --jq='
+      def colors: {
+        "black": "\u001b[30m",
+        "red": "\u001b[31m",
+        "green": "\u001b[32m",
+        "yellow": "\u001b[33m",
+        "blue": "\u001b[34m",
+        "magenta": "\u001b[35m",
+        "cyan": "\u001b[36m",
+        "white": "\u001b[37m",
+        "reset": "\u001b[0m"
+      };
+      def colored(text; color):
+        colors[color] + text + colors.reset;
+      (.data.viewer.notificationThreads.nodes | map(.title | length) | max) as $length |
+      .data.viewer.notificationThreads.nodes[] |
+      {
+        properties: {
+          id: .id,
+          isUnread: .isUnread,
+          state: .state,
+          stateReason: .stateReason,
+          title: .title,
+          type: .subject.__typename,
+          url: .url
+        },
+        readIcon:
+          if .isUnread then colored("";"yellow")
+          else colored(""; "blue")
+          end,
+        repository: colored(.subject.repository.nameWithOwner; "cyan"),
+        stateIcon:
+          if .subject.__typename == "PullRequest" then
+            if .subject.state == "OPEN" then colored(""; "green")
+            elif .subject.state == "MERGED" then colored(""; "magenta")
+            elif .subject.state == "CLOSED" then colored(""; "red")
+            else ""
+            end
+          elif .subject.__typename == "Issue" then
+            if .subject.state == "OPEN" then
+              if .subject.stateReason == "REOPENED" then colored(""; "green")
+              elif .subject.stateReason == null then colored(""; "green")
+              else ""
+              end
+            elif .subject.state == "CLOSED" then
+              if .subject.stateReason == "COMPLETED" then colored(""; "magenta")
+              elif .subject.stateReason == "NOT_PLANNED" then colored(""; "red")
+              else ""
+              end
+            else ""
+            end
+          else ""
+          end,
+        title: (.title | . + (" " * ($length - length)))
+      } | [ (.properties | tostring), .readIcon, .stateIcon, .title, .repository] | @tsv' |
+    sed -E 's,\\\\,\\,g'
+}
+
+function _mark_read() {
+  read -r ID
+  # shellcheck disable=SC2016
+  gh api graphql \
+    --field=id="$ID" \
+    --field=query='mutation($id: ID!) { markNotificationsAsRead(input: { ids: [$id] }) { success } }'
+}
+
+function _mark_done() {
+  read -r ID
+  # shellcheck disable=SC2016
+  gh api graphql \
+    --field=id="$ID" \
+    --field=query='mutation($id: ID!) { markNotificationAsDone(input: { id: $id }) { success } }'
+}
+
+function _get() {
+  read -r PROPERTIES
+  for k in "$@"; do
+    KEY="$k" yq '.[env(KEY)]' <<<"$PROPERTIES" | xargs echo -n " "
+  done
+}
+
+function _toggle_option() {
+  local OPTION="$1"
+  local VALUE
+  VALUE="$(_get_option "$OPTION")"
+  if [ "$VALUE" = "1" ]; then
+    local NEW_VALUE="0"
+  elif [ "$VALUE" = "0" ]; then
+    local NEW_VALUE="1"
+  fi
+  sed --regexp-extended "s/(${OPTION})\($VALUE\)/\1(${NEW_VALUE})/" <<<"$FZF_BORDER_LABEL"
+}
+
+function _get_option() {
+  if [ -z "${FZF_BORDER_LABEL-}" ]; then
+    local DEFAULT="$2"
+    echo "$DEFAULT"
+    return
+  fi
+
+  local OPTION="$1"
+  local VALUE
+  VALUE="$(sed --regexp-extended --silent "s/^.*${OPTION}\(([01])\).*\$/\1/p" <<<"$FZF_BORDER_LABEL")"
+
+  if [ -n "$VALUE" ]; then
+    echo "$VALUE"
+  else
+    echo "Failed to get option: $OPTION" >&2
+    exit 1
+  fi
+}
+
+function _preview() {
+  read -r TYPE URL <<<"$(_get type url <<<"$1")"
+  if [ "$(_get_option preview-diff "${PREVIEW_DIFF}")" = "1" ]; then
+    local MODE="diff"
+  else
+    local MODE="view"
+  fi
+
+  export GH_FORCE_TTY=1
+  case "$TYPE" in
+  Issue)
+    gh issue "${MODE}" "$URL"
+    ;;
+  PullRequest)
+    gh pr "${MODE}" "$URL"
+    ;;
+  esac
+}
+
+function _open() {
+  if command -v xdg-open &>/dev/null; then
+    xdg-open "$1"
+  elif command -v open &>/dev/null; then
+    open "$1"
+  elif command -v tmux &>/dev/null; then
+    tmux display-message -d 0 "$1"
+  else
+    echo "No method to open URLs found" >&2
+    return 1
+  fi
+}
+
+function _exec_fzf() {
+  echo -n "" | fzf \
+    --ansi \
+    --bind="d:execute-silent(_get id <<<{1} | _mark_done)+reload(_get_data)" \
+    --bind="o:become(_open \$(_get url <<<{1}))" \
+    --bind="p:toggle-preview" \
+    --bind="r:execute-silent(_get id <<<{1} | _mark_read)+reload(_get_data)" \
+    --bind="ctrl-p:transform-border-label(_toggle_option preview-diff)+refresh-preview" \
+    --bind="ctrl-r:transform-border-label(_toggle_option unread-only)+reload-sync(_get_data)" \
+    --bind='load:change-prompt($ )+disable-search+reload-sync(_get_data)+unbind(load)' \
+    --bind='change:change-header(search disabled)+clear-query' \
+    --border=bottom \
+    --border-label=" (d)one (o)pen (p)review-toggle (r)ead ^p preview-diff(${PREVIEW_DIFF}) ^r unread-only(${UNREAD_ONLY}) " \
+    --delimiter='\t' \
+    --header-first \
+    --no-sort \
+    --preview='(_preview {1})' \
+    --preview-window=hidden,wrap \
+    --with-nth=2..
+}
+
+export -f _get_data _mark_read _mark_done _get _toggle_option _get_option _exec_fzf _preview _open
+
+main "$@"

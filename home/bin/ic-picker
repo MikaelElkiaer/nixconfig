@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
+
+function main {
+  CLUSTER_NAME="${1:-}"
+  if [[ -n "$CLUSTER_NAME" ]]; then
+    ic get cluster-kubeconfig --cluster-name "$CLUSTER_NAME" >"$KUBECONFIG"
+    return
+  fi
+
+  ic get clusters -o json | jq -r '["ID","ENVIRONMENT","RESILIENCE ZONE"], (.clusters[] | [.id, .environment_name, .resilience_zone]) | @tsv' |
+    column -s $'\t' -t |
+    fzf \
+      --accept-nth="1" \
+      --delimiter=$'\t' \
+      --header-lines=1 \
+      --with-nth=1 |
+    awk '{print $1}' |
+    xargs ic get cluster-kubeconfig --cluster-id >"$KUBECONFIG"
+}
+
+main "$@"
