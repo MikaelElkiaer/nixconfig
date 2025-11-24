@@ -29,7 +29,7 @@ dev:
 # Activate the configuration
 [group('Main')]
 run:
-  nix run
+  nix run .#activate $USER@$HOSTNAME
 
 # Log in to GitHub
 [group('Bootstrap')]
