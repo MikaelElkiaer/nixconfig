@@ -1,14 +1,13 @@
-{
-  config,
-  flake,
-  ...
+{ config
+, flake
+, ...
 }:
-  let
+let
   # WARN: Does not work as expected
   # inherit (flake.inputs) self;
   # dotfilesHome = "${self}/home";
   dotfilesHome = "${config.home.homeDirectory}/Repositories/GitHub/dotfiles/home/nixos";
-  in
+in
 {
   home.file =
     {
