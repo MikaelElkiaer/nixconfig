@@ -1,13 +1,6 @@
 { config, pkgs, ... }:
 
 {
-  home.file = {
-    ".config/nvim" = {
-      recursive = true;
-      source = config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/Repositories/GitHub/nvim-config";
-    };
-  };
-
   home.packages = with pkgs; [
     neovim
     nvimpager
