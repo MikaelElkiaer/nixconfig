@@ -13,7 +13,7 @@
     nvimpager
     # LSP
     bash-language-server
-    dockerfile-language-server-nodejs
+    dockerfile-language-server
     gopls
     helm-ls
     lua-language-server
