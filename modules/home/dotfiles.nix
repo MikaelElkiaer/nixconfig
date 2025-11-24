@@ -6,7 +6,7 @@ let
   # WARN: Does not work as expected
   # inherit (flake.inputs) self;
   # dotfilesHome = "${self}/home";
-  dotfilesHome = "${config.home.homeDirectory}/Repositories/GitHub/dotfiles/home/nixos";
+  dotfilesHome = "${config.home.homeDirectory}/Repositories/GitHub/nixconfig/home";
 in
 {
   home.file =
