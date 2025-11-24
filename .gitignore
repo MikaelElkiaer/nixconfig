@@ -1,2 +1,6 @@
 result
 .direnv
+
+home/.config/lazygit/state.yml
+home/.config/navi/navi.log
+home/.config/tmux/plugins/
