@@ -30,3 +30,8 @@ dev:
 [group('Main')]
 run:
   nix run
+
+# Log in to GitHub
+[group('Bootstrap')]
+gh-login:
+  gh auth login --hostname=github.com --git-protocol=https --scopes=notifications,read:packages,read:org,read:project
