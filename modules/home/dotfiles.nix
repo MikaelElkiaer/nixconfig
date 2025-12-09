@@ -15,6 +15,10 @@ in
       # ".config/containers/registries.conf" = {
       #   source = config.lib.file.mkOutOfStoreSymlink "${dotfilesHome}/.config/containers/registries.conf";
       # };
+      # TODO: Turn into a module? Dynamically set 'credsStore' based on OS or other config
+      ".config/containers/auth.json" = {
+        source = config.lib.file.mkOutOfStoreSymlink "${dotfilesHome}/.config/containers/auth.json";
+      };
       ".config/home-manager" = {
         recursive = true;
         source = config.lib.file.mkOutOfStoreSymlink "${dotfilesHome}/.config/home-manager";
@@ -48,6 +52,9 @@ in
       };
       ".bashrc_extra" = {
         source = config.lib.file.mkOutOfStoreSymlink "${dotfilesHome}/.bashrc";
+      };
+      ".docker/config.json" = {
+        source = config.lib.file.mkOutOfStoreSymlink "${dotfilesHome}/.config/containers/auth.json";
       };
       ".gitconfig" = {
         source = config.lib.file.mkOutOfStoreSymlink "${dotfilesHome}/.gitconfig";
