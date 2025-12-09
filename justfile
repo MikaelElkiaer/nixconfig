@@ -22,7 +22,7 @@ news:
   home-manager --flake . news
 
 # Log in to GitHub
-[group('Bootstrap')]
+[group('bootstrap')]
 gh-login:
   gh auth login --hostname=github.com --git-protocol=https --scopes=notifications,read:packages,read:org,read:project
 
