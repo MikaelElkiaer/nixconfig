@@ -54,10 +54,18 @@ function __prompt_command {
     exitcode_prompt=" ${color_prompt+$red} $EXIT${color_prompt+$reset}"
   fi
 
+  local magenta="$(tput setaf 5)"
+  local virtualenv_prompt
+  if [ -n "$VIRTUAL_ENV_PROMPT" ]; then
+    virtualenv_prompt="${color_prompt+$magenta}${VIRTUAL_ENV_PROMPT}${color_prompt+$reset}"
+  fi
+
   local blue="$(tput setaf 4)"
   local dir_prompt="${color_prompt+$blue}\w${color_prompt+$reset}"
 
-  PS1="$dir_prompt"
+  PS1=""
+  PS1+="$dir_prompt"
+  PS1+=" $virtualenv_prompt"
   PS1+="$exitcode_prompt"
   PS1+="\nλ "
 }
