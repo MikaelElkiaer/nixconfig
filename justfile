@@ -11,6 +11,21 @@ default:
 update:
   nix flake update
 
+# Activate the configuration
+[group('Main')]
+run:
+  nix run .#activate $USER@$HOSTNAME
+
+# See home-manager news
+[group('Main')]
+news:
+  home-manager --flake . news
+
+# Log in to GitHub
+[group('Bootstrap')]
+gh-login:
+  gh auth login --hostname=github.com --git-protocol=https --scopes=notifications,read:packages,read:org,read:project
+
 # Lint nix files
 [group('dev')]
 lint:
@@ -25,13 +40,3 @@ check:
 [group('dev')]
 dev:
   nix develop
-
-# Activate the configuration
-[group('Main')]
-run:
-  nix run .#activate $USER@$HOSTNAME
-
-# Log in to GitHub
-[group('Bootstrap')]
-gh-login:
-  gh auth login --hostname=github.com --git-protocol=https --scopes=notifications,read:packages,read:org,read:project
