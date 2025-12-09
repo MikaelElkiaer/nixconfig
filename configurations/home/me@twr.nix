@@ -1,4 +1,4 @@
-{ flake, ... }:
+{ flake, pkgs, ... }:
 let
   inherit (flake) inputs;
   inherit (inputs) self;
@@ -15,6 +15,10 @@ in
     fullname = "Mikael Elkiaer";
     email = "me@twr";
   };
+
+  home.packages = with pkgs; [
+    python313Packages.universal-silabs-flasher
+  ];
 
   home.stateVersion = "24.11";
 }
