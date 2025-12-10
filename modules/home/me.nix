@@ -18,6 +18,6 @@
     };
   };
   config = {
-    home.username = config.me.username;
+    home.username = lib.mkDefault config.me.username;
   };
 }
