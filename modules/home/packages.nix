@@ -10,12 +10,14 @@
     # dagger
     delta
     docker-credential-helpers
+    entr
     expect
     file
     fluxcd
     fzf
+    gemini-cli
+    github-copilot-cli
     gh
-    gh-copilot
     gh-dash
     gh-markdown-preview
     git
@@ -25,9 +27,9 @@
     gotop
     gitmux
     gnumake
+    just
     htop
     hyperfine
-    just
     kind
     k9s
     krew
