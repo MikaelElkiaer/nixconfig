@@ -25,7 +25,8 @@ in
     awscli2
     crane
     grizzly # Grafana manager - with jsonnet support
-    ic
+    # TODO: Re-enable using nixos-unified
+    # ic
     jsonnet
     jsonnet-bundler
     kubelogin # Azure

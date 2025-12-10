@@ -6,9 +6,11 @@
     cargo
     # WARN: Comes with nix-unified
     # comma
-    # WARN: Not supported by darwin
+    # TODO: Re-enable using nixos-unified
     # dagger
     delta
+    # TODO: Re-enable using nixos-unified
+    # docker-credential-ghcr-login
     docker-credential-helpers
     entr
     expect
