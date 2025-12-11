@@ -1,4 +1,7 @@
-{ pkgs, ... }:
+{ pkgs, self, ... }:
+let
+  custom = self.packages.${pkgs.system};
+in
 {
   home.packages = with pkgs; [
     atuin
@@ -9,8 +12,7 @@
     # TODO: Re-enable using nixos-unified
     # dagger
     delta
-    # TODO: Re-enable using nixos-unified
-    # docker-credential-ghcr-login
+    custom.docker-credential-ghcr-login
     docker-credential-helpers
     entr
     expect
