@@ -2,6 +2,7 @@
 let
   inherit (flake.inputs) self;
   custom = self.packages.${pkgs.system};
+  dagger = self.inputs.dagger.packages.${pkgs.system}.dagger;
 in
 {
   home.packages = with pkgs; [
@@ -10,8 +11,7 @@ in
     cargo
     # WARN: Comes with nix-unified
     # comma
-    # TODO: Re-enable using nixos-unified
-    # dagger
+    dagger
     delta
     custom.docker-credential-ghcr-login
     docker-credential-helpers
