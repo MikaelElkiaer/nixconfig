@@ -16,9 +16,8 @@ jobs:
             system: aarch64-darwin
       fail-fast: false
     steps:
-      - uses: cachix/install-nix-action@v31
-        with:
-          nix_path: nixpkgs=channel:nixos-unstable
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
       - name: install om
         run: |
           nix --accept-flake-config profile install github:juspay/omnix
