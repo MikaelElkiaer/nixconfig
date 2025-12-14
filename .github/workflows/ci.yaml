@@ -10,7 +10,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - runs-on: unbuntu-latest
+          - runs-on: ubuntu-latest
             system: aarch64-darwin
           - runs-on: macos-latest
             system: x86_64-linux
