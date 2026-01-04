@@ -4,6 +4,9 @@ let
   dagger = flake.self.inputs.dagger.packages.${pkgs.system};
 in
 {
+  nixpkgs.overlays = [
+    flake.overlays.omnix
+  ];
   home.packages = with pkgs; [
     atuin
     bats
