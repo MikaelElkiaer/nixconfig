@@ -1,4 +1,8 @@
-{ config, pkgs, lib, ... }:
+{ config, pkgs, lib, flake, ... }:
+let
+  inherit (flake) inputs;
+  inherit (inputs) self;
+in
 {
   # To use the `nix` from `inputs.nixpkgs` on templates using the standalone `home-manager` template
 
@@ -11,5 +15,6 @@
   nixpkgs.config = {
     allowUnfree = true;
   };
+  nixpkgs.overlays = lib.attrValues self.overlays;
   programs.home-manager.enable = true;
 }
